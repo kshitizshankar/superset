@@ -14,6 +14,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from collections.abc import Iterable
+from datetime import datetime
 from typing import Any
 
 from marshmallow import ValidationError
@@ -22,6 +24,7 @@ from superset.commands.chart.exceptions import (
     ChartQueryContextDatasourceMismatchValidationError,
 )
 from superset.commands.exceptions import DatasourceTypeInvalidError
+from superset.models.dashboard import Dashboard
 from superset.utils import json
 from superset.utils.core import DatasourceType
 
@@ -81,3 +84,15 @@ def validate_query_context_datasource(
 
     if not ids_match or not types_match:
         exceptions.append(ChartQueryContextDatasourceMismatchValidationError())
+
+
+def touch_dashboards(dashboards: Iterable[Dashboard] | None) -> None:
+    """Bump ``changed_on`` on dashboards a chart save has just attached.
+
+    Linking a chart only writes a ``dashboard_slices`` association row,
+    which does not dirty the parent dashboard row, so without this the
+    row's audit fields (``changed_on``, and ``changed_by_fk`` via its
+    ``onupdate``) would keep showing a stale "Last modified".
+    """
+    for dashboard in dashboards or []:
+        dashboard.changed_on = datetime.now()
