@@ -23,6 +23,7 @@ from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock, Mock, patch
 from urllib.error import URLError
+from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
 
 import pytest
@@ -81,6 +82,7 @@ from superset.reports.notifications.exceptions import (
 from superset.reports.notifications.slack import SlackNotification
 from superset.reports.notifications.slack_channel_resolver import _match_slack_channel
 from superset.reports.notifications.slack_mixin import SlackMixin
+from superset.reports.types import ReportScheduleExtra
 from superset.subjects.types import SubjectType
 from superset.utils.core import HeaderDataType
 from superset.utils.report_execution import (
@@ -1130,6 +1132,7 @@ def test_get_dashboard_urls_with_multiple_tabs(
     mock_report_schedule.chart = False
     mock_report_schedule.chart_id = None
     mock_report_schedule.dashboard_id = 123
+    mock_report_schedule.force_screenshot = False
     mock_report_schedule.type = "report_type"
     mock_report_schedule.report_format = "report_format"
     mock_report_schedule.editors = _make_mock_editors(mocker, [1, 2])
@@ -1292,6 +1295,7 @@ def test_get_dashboard_urls_with_filters_and_tabs(
     mock_report_schedule.chart = False
     mock_report_schedule.chart_id = None
     mock_report_schedule.dashboard_id = 123
+    mock_report_schedule.force_screenshot = False
     mock_report_schedule.type = "report_type"
     mock_report_schedule.report_format = "report_format"
     mock_report_schedule.editors = _make_mock_editors(mocker, [1, 2])
@@ -1454,6 +1458,7 @@ def test_get_dashboard_urls_with_filters_no_tabs(
     mock_report_schedule.chart = False
     mock_report_schedule.chart_id = None
     mock_report_schedule.dashboard_id = 123
+    mock_report_schedule.force_screenshot = False
     mock_report_schedule.type = "report_type"
     mock_report_schedule.report_format = "report_format"
     mock_report_schedule.editors = _make_mock_editors(mocker, [1, 2])
@@ -1613,6 +1618,7 @@ def test_get_tab_urls(
 ) -> None:
     mock_report_schedule: ReportSchedule = mocker.Mock(spec=ReportSchedule)
     mock_report_schedule.dashboard_id = 123
+    mock_report_schedule.force_screenshot = False
 
     class_instance: BaseReportState = BaseReportState(
         mock_report_schedule, "January 1, 2021", "execution_id_example"
@@ -1699,6 +1705,7 @@ def test_get_tab_url(
 ) -> None:
     mock_report_schedule: ReportSchedule = mocker.Mock(spec=ReportSchedule)
     mock_report_schedule.dashboard_id = 123
+    mock_report_schedule.force_screenshot = False
 
     class_instance: BaseReportState = BaseReportState(
         mock_report_schedule, "January 1, 2021", "execution_id_example"
@@ -5899,3 +5906,87 @@ def test_chart_data_http_failure_does_not_expose_request(
     opener.open.assert_called_once()
     assert "SECRET" not in caplog.text + str(exc.value)
     assert "SECRET" not in "".join(traceback.format_exception(exc.value))
+
+
+def _forced_dashboard_report(
+    mocker: MockerFixture, extra: ReportScheduleExtra, native_filters: str
+) -> BaseReportState:
+    schedule = mocker.Mock(spec=ReportSchedule)
+    schedule.chart = False
+    schedule.chart_id = None
+    schedule.dashboard_id = 1
+    schedule.force_screenshot = True
+    schedule.extra = extra
+    schedule.get_native_filters_params.return_value = (native_filters, [])
+    dashboard = MagicMock()
+    dashboard.uuid = UUID("12345678-1234-1234-1234-123456789abc")
+    schedule.dashboard = dashboard
+    state = BaseReportState(schedule, "January 1, 2021", "execution_id_example")
+    state._report_schedule = schedule
+    return state
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        pytest.param({}, id="native-filters-only"),
+        pytest.param(
+            {"dashboard": {"anchor": "TAB-1", "urlParams": None}},
+            id="single-tab",
+        ),
+        pytest.param(
+            {"dashboard": {"anchor": '["TAB-1", "TAB-2"]', "urlParams": None}},
+            id="multi-tab",
+        ),
+        pytest.param(
+            {"dashboard": {"anchor": "", "urlParams": [["standalone", "true"]]}},
+            id="url-params-only",
+        ),
+    ],
+)
+@patch("superset.commands.report.execute.db.session.commit")
+@patch("superset.commands.report.execute.CreateDashboardPermalinkCommand")
+@with_feature_flags(ALERT_REPORT_TABS=True)
+def test_get_dashboard_urls_permalink_propagates_force(
+    mock_permalink_cls: MagicMock,
+    mock_commit: MagicMock,
+    mocker: MockerFixture,
+    app: SupersetApp,
+    extra: ReportScheduleExtra,
+) -> None:
+    """With "Ignore cache" (force_screenshot) enabled, permalink-based dashboard
+    report URLs (tabs, native filters, urlParams) must carry force=true so the
+    dashboard's chart-data requests bypass the cache."""
+    mock_permalink_cls.return_value.run.return_value = "key1"
+    native_filters = (
+        "(NATIVE_FILTER-1:(filterState:(value:!(a))))" if not extra else "()"
+    )
+    report_state = _forced_dashboard_report(mocker, extra, native_filters)
+
+    urls = report_state.get_dashboard_urls()
+
+    assert urls
+    for url in urls:
+        assert "/dashboard/p/" in url
+        assert parse_qs(urlsplit(url).query).get("force") == ["true"], url
+
+
+@patch("superset.commands.report.execute.db.session.commit")
+@patch("superset.commands.report.execute.CreateDashboardPermalinkCommand")
+@with_feature_flags(ALERT_REPORT_TABS=True)
+def test_get_url_dashboard_tab_state_propagates_force(
+    mock_permalink_cls: MagicMock,
+    mock_commit: MagicMock,
+    mocker: MockerFixture,
+    app: SupersetApp,
+) -> None:
+    """_get_url for a dashboard with tab state must also carry force=true."""
+    mock_permalink_cls.return_value.run.return_value = "key1"
+    report_state = _forced_dashboard_report(
+        mocker, {"dashboard": {"anchor": "TAB-1", "urlParams": None}}, "()"
+    )
+
+    url = report_state._get_url()
+
+    assert "/dashboard/p/" in url
+    assert parse_qs(urlsplit(url).query).get("force") == ["true"], url

@@ -846,10 +846,14 @@ class BaseReportState:
         # (#40996).
         db.session.commit()  # pylint: disable=consider-using-transaction
 
+        force_kwargs = (
+            {"force": "true"} if self._report_schedule.force_screenshot else {}
+        )
         return get_url_path(
             "Superset.dashboard_permalink",
             key=permalink_key,
             user_friendly=user_friendly,
+            **force_kwargs,
         )
 
     @staticmethod
