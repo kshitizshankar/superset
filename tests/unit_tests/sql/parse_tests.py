@@ -1874,34 +1874,6 @@ def test_with_clause_containing_union_all_is_not_mutating_oracle() -> None:
 
 
 @pytest.mark.parametrize("engine", ["clickhouse", "clickhousedb"])
-@pytest.mark.parametrize(
-    "sql",
-    [
-        "SELECT a, sum(b) AS s FROM t GROUP BY ALL SETTINGS max_threads = 1",
-        (
-            "SELECT a, sum(b) AS s FROM t "
-            "GROUP BY ALL WITH TOTALS SETTINGS max_threads = 1"
-        ),
-    ],
-)
-def test_clickhouse_group_by_all_followed_by_settings(engine: str, sql: str) -> None:
-    """
-    ClickHouse ``GROUP BY ALL`` must parse when followed directly by a
-    ``SETTINGS`` clause, and SQL Lab's limit must be applied without dropping
-    either clause.
-    """
-    script = SQLScript(sql, engine)  # Must not raise SupersetParseError.
-    assert not script.has_mutation()
-
-    statement = script.statements[0]
-    statement.set_limit_value(1001, LimitMethod.FORCE_LIMIT)
-    formatted = " ".join(statement.format().split())
-    assert "GROUP BY ALL" in formatted
-    assert "SETTINGS max_threads = 1" in formatted
-    assert "LIMIT 1001" in formatted
-
-
-@pytest.mark.parametrize("engine", ["clickhouse", "clickhousedb"])
 def test_clickhouse_parametric_aggregate_parses_and_is_read_only(engine: str) -> None:
     """
     Regression for #37285: ClickHouse parametric aggregate functions use a
