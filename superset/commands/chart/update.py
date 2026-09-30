@@ -35,6 +35,7 @@ from superset.commands.chart.exceptions import (
     DatasourceTypeUpdateRequiredValidationError,
 )
 from superset.commands.chart.utils import (
+    touch_dashboards,
     validate_chart_datasource_type,
     validate_query_context_datasource,
 )
@@ -104,7 +105,15 @@ class UpdateChartCommand(UpdateMixin, BaseCommand):
                 self._properties["params"],
             )
 
-        return ChartDAO.update(self._model, self._properties)
+        existing_dashboard_ids = {d.id for d in self._model.dashboards}
+        new_dashboards = [
+            dashboard
+            for dashboard in self._properties.get("dashboards", [])
+            if dashboard.id not in existing_dashboard_ids
+        ]
+        chart = ChartDAO.update(self._model, self._properties)
+        touch_dashboards(new_dashboards)
+        return chart
 
     def _validate_new_dashboard_access(
         self, requested_dashboards: list[Dashboard], exceptions: list[ValidationError]
