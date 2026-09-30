@@ -15,27 +15,28 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from .clickhouse import ClickHouse
-from .databend import Databend
-from .db2 import DB2
-from .dremio import Dremio
-from .firebolt import Firebolt, FireboltOld
-from .hana import Hana
-from .opensearch import OpenSearch
-from .pinot import Pinot
-from .starrocks import StarRocks
-from .vertica import Vertica
+"""
+ClickHouse dialect for Superset, extending sqlglot's built-in ClickHouse dialect.
+"""
 
-__all__ = [
-    "ClickHouse",
-    "DB2",
-    "Databend",
-    "Dremio",
-    "Firebolt",
-    "FireboltOld",
-    "Hana",
-    "OpenSearch",
-    "Pinot",
-    "StarRocks",
-    "Vertica",
-]
+from __future__ import annotations
+
+from sqlglot.dialects.clickhouse import ClickHouse as _ClickHouse
+from sqlglot.tokens import TokenType
+
+
+class ClickHouse(_ClickHouse):
+    """
+    ClickHouse dialect.
+
+    ``SETTINGS`` and ``FORMAT`` are registered as query modifier tokens so the
+    ``GROUP BY`` parser stops before them. Without this, ``GROUP BY ALL
+    SETTINGS max_threads = 1`` reads ``SETTINGS`` as a grouping expression and
+    fails on the remainder of the clause.
+    """
+
+    class Parser(_ClickHouse.Parser):
+        QUERY_MODIFIER_TOKENS = _ClickHouse.Parser.QUERY_MODIFIER_TOKENS | {
+            TokenType.SETTINGS,
+            TokenType.FORMAT,
+        }
