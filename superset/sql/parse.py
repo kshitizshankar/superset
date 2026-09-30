@@ -3129,7 +3129,7 @@ def sanitize_clause(clause: str, engine: str) -> str:
             # expressions defined by a custom Superset dialect (e.g. Doris'
             # full-text search operators) can only be rendered by that dialect
             return _normalized_generator(
-                statement._dialect,  # pylint: disable=protected-access
+                SQLGLOT_DIALECTS.get(engine),
                 pretty=False,
                 comments=True,
             ).generate(
