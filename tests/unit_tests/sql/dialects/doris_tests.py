@@ -18,7 +18,7 @@
 
 import pytest
 
-from superset.sql.parse import SQLScript
+from superset.sql.parse import sanitize_clause, SQLScript
 
 
 @pytest.mark.parametrize(
@@ -64,3 +64,15 @@ def test_doris_full_text_search_operators(sql: str, predicate: str) -> None:
 
     assert len(script.statements) == 1
     assert script.format() == "SELECT\n  *\nFROM t\nWHERE\n  " + predicate
+
+
+def test_doris_full_text_search_operators_sanitize_clause_with_comment() -> None:
+    """
+    A clause with a comment is re-rendered by `sanitize_clause`, which must be able
+    to generate Doris full-text search operators.
+    """
+    clause = "column1 MATCH_ANY 'word1 word2' -- comment"
+
+    assert sanitize_clause(clause, "pydoris") == (
+        "column1 MATCH_ANY 'word1 word2' /* comment */"
+    )

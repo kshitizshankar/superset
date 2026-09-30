@@ -3116,14 +3116,26 @@ def sanitize_clause(clause: str, engine: str) -> str:
         if not any(node.comments for node in parsed.walk()):
             return clause.rstrip().rstrip(";").rstrip()
 
-        return _normalized_generator(
-            None,
-            pretty=False,
-            comments=True,
-        ).generate(
-            parsed,
-            copy=True,
-        )
+        try:
+            return _normalized_generator(
+                None,
+                pretty=False,
+                comments=True,
+            ).generate(
+                parsed,
+                copy=True,
+            )
+        except ValueError:
+            # expressions defined by a custom Superset dialect (e.g. Doris'
+            # full-text search operators) can only be rendered by that dialect
+            return _normalized_generator(
+                statement._dialect,  # pylint: disable=protected-access
+                pretty=False,
+                comments=True,
+            ).generate(
+                parsed,
+                copy=True,
+            )
     except SupersetParseError as ex:
         raise QueryClauseValidationException(f"Invalid SQL clause: {clause}") from ex
 
