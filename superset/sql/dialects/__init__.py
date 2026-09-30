@@ -18,6 +18,7 @@
 from .clickhouse import ClickHouse
 from .databend import Databend
 from .db2 import DB2
+from .doris import Doris
 from .dremio import Dremio
 from .firebolt import Firebolt, FireboltOld
 from .hana import Hana
@@ -30,6 +31,7 @@ __all__ = [
     "ClickHouse",
     "DB2",
     "Databend",
+    "Doris",
     "Dremio",
     "Firebolt",
     "FireboltOld",
