@@ -22,28 +22,45 @@ from superset.sql.parse import SQLScript
 
 
 @pytest.mark.parametrize(
-    "operator",
+    "sql, predicate",
     [
-        "MATCH",
-        "MATCH_ANY",
-        "MATCH_ALL",
-        "MATCH_PHRASE",
-        "MATCH_PHRASE_PREFIX",
-        "MATCH_PHRASE_EDGE",
-        "MATCH_REGEXP",
+        (
+            "SELECT * FROM t WHERE column1 MATCH 'word1 word2'",
+            "column1 MATCH 'word1 word2'",
+        ),
+        (
+            "SELECT * FROM t WHERE column1 MATCH_ANY 'word1 word2'",
+            "column1 MATCH_ANY 'word1 word2'",
+        ),
+        (
+            "SELECT * FROM t WHERE column1 MATCH_ALL 'word1 word2'",
+            "column1 MATCH_ALL 'word1 word2'",
+        ),
+        (
+            "SELECT * FROM t WHERE column1 MATCH_PHRASE 'word1 word2'",
+            "column1 MATCH_PHRASE 'word1 word2'",
+        ),
+        (
+            "SELECT * FROM t WHERE column1 MATCH_PHRASE_PREFIX 'word1 word2'",
+            "column1 MATCH_PHRASE_PREFIX 'word1 word2'",
+        ),
+        (
+            "SELECT * FROM t WHERE column1 MATCH_PHRASE_EDGE 'word1 word2'",
+            "column1 MATCH_PHRASE_EDGE 'word1 word2'",
+        ),
+        (
+            "SELECT * FROM t WHERE column1 MATCH_REGEXP 'word1 word2'",
+            "column1 MATCH_REGEXP 'word1 word2'",
+        ),
     ],
 )
-def test_doris_full_text_search_operators(operator: str) -> None:
+def test_doris_full_text_search_operators(sql: str, predicate: str) -> None:
     """
     Doris full-text search operators are infix: `<column> MATCH_ANY '<text>'`.
 
     https://doris.apache.org/docs/table-design/index/inverted-index
     """
-    sql = f"SELECT * FROM t WHERE column1 {operator} 'word1 word2'"  # noqa: S608
-
     script = SQLScript(sql, "pydoris")
 
     assert len(script.statements) == 1
-    assert script.format() == (
-        f"SELECT\n  *\nFROM t\nWHERE\n  column1 {operator} 'word1 word2'"
-    )
+    assert script.format() == "SELECT\n  *\nFROM t\nWHERE\n  " + predicate
