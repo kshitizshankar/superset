@@ -41,7 +41,7 @@ from superset.models.slice import Slice
 @pytest.fixture
 def session_with_dashboard(session: Session) -> Iterator[tuple[Session, Dashboard]]:
     engine = session.get_bind()
-    Dashboard.metadata.create_all(engine)  # pylint: disable=no-member
+    Dashboard.metadata.create_all(engine)
 
     dashboard = Dashboard(
         id=1,
