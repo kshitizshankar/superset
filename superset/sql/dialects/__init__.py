@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from .clickhouse import ClickHouse
 from .databend import Databend
 from .db2 import DB2
 from .dremio import Dremio
@@ -26,6 +27,7 @@ from .starrocks import StarRocks
 from .vertica import Vertica
 
 __all__ = [
+    "ClickHouse",
     "DB2",
     "Databend",
     "Dremio",
