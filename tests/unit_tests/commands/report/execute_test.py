@@ -5911,13 +5911,13 @@ def test_chart_data_http_failure_does_not_expose_request(
 def _forced_dashboard_report(
     mocker: MockerFixture, extra: ReportScheduleExtra, native_filters: str
 ) -> BaseReportState:
-    schedule: ReportSchedule = mocker.Mock(spec=ReportSchedule)
+    schedule = mocker.Mock(spec=ReportSchedule)
     schedule.chart = False
     schedule.chart_id = None
     schedule.dashboard_id = 1
     schedule.force_screenshot = True
     schedule.extra = extra
-    schedule.get_native_filters_params.return_value = (native_filters, [])  # type: ignore
+    schedule.get_native_filters_params.return_value = (native_filters, [])
     dashboard = MagicMock()
     dashboard.uuid = UUID("12345678-1234-1234-1234-123456789abc")
     schedule.dashboard = dashboard
