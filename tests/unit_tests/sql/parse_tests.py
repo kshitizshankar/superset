@@ -3034,6 +3034,49 @@ def test_set_limit_value_keeps_clickhouse_top_level_modifiers() -> None:
     assert SQLStatement(limited, "clickhouse").format() == limited
 
 
+@pytest.mark.parametrize("engine", ["clickhouse", "clickhousedb"])
+@pytest.mark.parametrize(
+    "sql, modifier",
+    [
+        (
+            "SELECT a, sum(b) AS s FROM t GROUP BY ALL SETTINGS max_threads = 1",
+            "SETTINGS max_threads = 1",
+        ),
+        (
+            "SELECT a, sum(b) AS s FROM t GROUP BY ALL WITH TOTALS "
+            "SETTINGS max_threads = 1",
+            "SETTINGS max_threads = 1",
+        ),
+        (
+            "SELECT a, sum(b) AS s FROM t GROUP BY ALL FORMAT JSONCompact",
+            "FORMAT JSONCompact",
+        ),
+    ],
+)
+def test_clickhouse_group_by_all_followed_by_query_modifier(
+    engine: str,
+    sql: str,
+    modifier: str,
+) -> None:
+    """
+    ClickHouse ``GROUP BY ALL`` must parse when directly followed by a
+    ``SETTINGS`` or ``FORMAT`` clause, and SQL Lab's row limit must be applied
+    without dropping either clause.
+    """
+    script = SQLScript(sql, engine)
+    assert not script.has_mutation()
+
+    statement = script.statements[0]
+    statement.set_limit_value(1001, LimitMethod.FORCE_LIMIT)
+    limited = statement.format()
+    flattened = " ".join(limited.split())
+
+    assert "GROUP BY ALL" in flattened
+    assert modifier in flattened
+    assert "LIMIT 1001" in flattened
+    assert SQLStatement(limited, engine).format() == limited
+
+
 @pytest.mark.parametrize(
     "engine", ["clickhouse", "clickhousedb", "postgresql", "mysql"]
 )
